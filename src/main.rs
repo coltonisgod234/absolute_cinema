@@ -61,8 +61,8 @@ fn main() -> opencv::Result<()> {
     } else { None };
 
     let render_function: fn(&Mat, u16, u16) -> Result<(), opencv::Error> = match args.low_resolution {
-        //false => video::render_frame_hi_res,
-        false => video::render_frame_for_decs_fucking_retarded_ass_protocol,
+        false => video::render_frame_hi_res,
+        //false => video::render_frame_for_decs_fucking_retarded_ass_protocol,
         true => video::render_frame_lo_res
     };
     loop {
