@@ -10,6 +10,7 @@ use opencv::{
 };
 mod audio;
 mod video;
+mod sixel;
 
 #[derive(Parser)]
 struct Cli {
@@ -18,8 +19,14 @@ struct Cli {
     #[arg(short='a', long="no-audio", help="disable audio")]
     no_audio: bool,
 
-    #[arg(short='l', long="low-resolution", help="don't use block characters to increase vertical resolution")]
-    low_resolution: bool,
+    #[arg(short='g', long="graphics", help="graphics mode", default_value="high")]
+    graphics_mode: String,
+
+    #[arg(short='W', long="width", help="resize the image to this width")]
+    width: Option<u16>,
+
+    #[arg(short='H', long="height", help="resize the image to this height")]
+    height: Option<u16>,
 
     #[arg(short='s', long="no-status-bar", help="don't print the status bar")]
     no_status_bar: bool,
@@ -32,7 +39,6 @@ fn main() -> opencv::Result<()> {
     let args: Cli = Cli::parse();
     // Debug: show OpenCV build info
     let video_path: &str = args.path.as_str();
-    println!("{}", opencv::core::get_build_information()?);
 
     // Open the video file
     let mut cap: VideoCapture = VideoCapture::from_file(
@@ -47,10 +53,17 @@ fn main() -> opencv::Result<()> {
     // Get playback parameters
     let fps: f64 = cap.get(CAP_PROP_FPS)?;
     let frame_delay: Duration = video::duration_from_fps(fps);
-    let (term_width, term_height) = terminal::size().unwrap_or((80, 25));
-    let actual_pixels_height: u16 = match args.low_resolution {
-        false => (term_height * 2) - 1,
-        true => term_height - 1
+
+    // set width/height for frames
+    let (mut term_width, mut term_height) = terminal::size().unwrap_or((80, 25));
+    if args.width.is_some() { term_width = args.width.unwrap(); }
+    if args.height.is_some() { term_height = args.height.unwrap(); }
+    if args.width.is_none() && args.graphics_mode == "high" { term_height = (term_height * 2) - 1; }
+
+    let render_function: fn(&Mat, u16, u16) -> Result<(), opencv::Error> = match args.graphics_mode.as_str() {
+        "low" => video::render_frame_lo_res,
+        "sixel" => sixel::fuck_data_equipment_corperation,
+        _ => video::render_frame_hi_res
     };
 
     let mut frame: Mat = Mat::default();
@@ -59,12 +72,6 @@ fn main() -> opencv::Result<()> {
     let _stream: Option<rodio::OutputStream> = if !args.no_audio {
         Some(audio::start_audio(video_path).expect("audio failed to start"))
     } else { None };
-
-    let render_function: fn(&Mat, u16, u16) -> Result<(), opencv::Error> = match args.low_resolution {
-        false => video::render_frame_hi_res,
-        //false => video::render_frame_for_decs_fucking_retarded_ass_protocol,
-        true => video::render_frame_lo_res
-    };
     loop {
         let read_start = Instant::now();
         if !cap.read(&mut frame)? || frame.empty() {
@@ -78,7 +85,7 @@ fn main() -> opencv::Result<()> {
         if args.clear_screen {
             print!("\x1B[2J");
         }
-        render_function(&mut frame, term_width, actual_pixels_height)?;
+        render_function(&mut frame, term_width, term_height)?;
 
         let loop_end = Instant::now();
         let loop_duration = loop_end - loop_start;

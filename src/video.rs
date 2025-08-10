@@ -1,7 +1,5 @@
 use std::{
-    fmt::Write as FmtWrite,
-    io::{stdout, Write},
-    time::Duration
+    fmt::Write as FmtWrite, io::{stdout, Write}, time::Duration
 };
 use opencv::{
     core::Vec3b,
@@ -12,61 +10,6 @@ use opencv::{
 pub fn duration_from_fps(fps: f64) -> Duration {
     assert!(fps > 0.0, "Invalid FPS: {}", fps);
     return Duration::from_secs_f64(1.0 / fps);
-}
-
-fn rgb_to_sixel_percent(c: u8) -> u8 {
-    ((c as f32 / 255.0) * 100.0).round() as u8
-}
-
-fn draw_sixel_col(pixels: [bool;6], colour: Vec3b, register: i32) -> opencv::Result<()> {
-    let r: u8 = rgb_to_sixel_percent(colour[2]); // OpenCV stores as BGR, so reverse
-    let g: u8 = rgb_to_sixel_percent(colour[1]);
-    let b: u8 = rgb_to_sixel_percent(colour[0]);
-    let color_index: i32 = register;  // always 0 right now
-
-    print!("#{};2;{};{};{}", color_index, r, g, b);  // define colour
-    print!("#{}", color_index);  // switch to that colour
-
-    // do some "who's that pokemon" ahh bullshit to find the fucking char to print
-    let mut bits: u8 = 0u8;
-    for (idx, on) in pixels.iter().enumerate() {
-        if *on {
-            bits |= 1 << idx;
-        }
-    }
-
-    // print the fucking character
-    print!("{}", (bits + 63) as char);
-    Ok(())
-}
-
-pub fn render_frame_for_decs_fucking_retarded_ass_protocol(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
-    let mut small_frame = Mat::default();
-    resize(
-        frame,
-        &mut small_frame,
-        opencv::core::Size { width: term_width as i32, height: term_height as i32 },
-        0.0,
-        0.0,
-        INTER_LINEAR,
-    )?;
-    print!("\x1BPq");  // enter sixel
-    
-    /*for row in 0..small_frame.rows() {
-        for col in 0..small_frame.cols() {
-        }
-    }*/
-    draw_sixel_col([false, false, false, false, false, true], Vec3b::from([255, 255, 255]), 0)?;
-    print!("-");
-    draw_sixel_col([true, true, true, true, true, true], Vec3b::from([128, 128, 128]), 0)?;
-    print!("-");
-    draw_sixel_col([true, true, true, true, true, true], Vec3b::from([128, 128, 128]), 0)?;
-    print!("-");
-    draw_sixel_col([true, true, true, true, true, true], Vec3b::from([128, 128, 128]), 0)?;
-    print!("-");
-    //draw_sixel_col([true, false, true, false, true, false], Vec3b::from([255, 255, 255]))?;
-    print!("\x1b\\");  // exit sixel
-    Ok(())
 }
 
 pub fn render_frame_hi_res(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
