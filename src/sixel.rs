@@ -34,7 +34,7 @@ fn draw_sixel_col(pixels: [bool;6], colour: Vec3b, register: u8) -> opencv::Resu
 fn sixel_is_on(pixel: Vec3b) -> bool {
     // BGR to brightness
     let brightness = (0.299 * pixel[2] as f32 + 0.587 * pixel[1] as f32 + 0.114 * pixel[0] as f32) as u8;
-    brightness > 100
+    brightness > 127
 }
 
 pub fn fuck_data_equipment_corperation(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {

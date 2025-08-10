@@ -58,12 +58,18 @@ fn main() -> opencv::Result<()> {
     let (mut term_width, mut term_height) = terminal::size().unwrap_or((80, 25));
     if args.width.is_some() { term_width = args.width.unwrap(); }
     if args.height.is_some() { term_height = args.height.unwrap(); }
-    if args.width.is_none() && args.graphics_mode == "high" { term_height = (term_height * 2) - 1; }
+    if args.width.is_none()
+        && args.graphics_mode == "high"
+        || args.graphics_mode == "cheesegrater"
+        {
+            term_height = (term_height * 2) - 1;
+        }
 
     let render_function: fn(&Mat, u16, u16) -> Result<(), opencv::Error> = match args.graphics_mode.as_str() {
-        "low" => video::render_frame_lo_res,
         "sixel" => sixel::fuck_data_equipment_corperation,
-        _ => video::render_frame_hi_res
+        "high" => video::render_frame_hi_res_normal,
+        "cheesegrater" => video::cheese_grater,
+        _ => video::render_frame_lo_res,  // low
     };
 
     let mut frame: Mat = Mat::default();

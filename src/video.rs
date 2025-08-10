@@ -12,7 +12,7 @@ pub fn duration_from_fps(fps: f64) -> Duration {
     return Duration::from_secs_f64(1.0 / fps);
 }
 
-pub fn render_frame_hi_res(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
+pub fn render_frame_hi_res(frame: &Mat, term_width: u16, term_height: u16, ch: char) -> opencv::Result<()> {
     let mut small_frame = Mat::default();
     resize(
         frame,
@@ -32,7 +32,7 @@ pub fn render_frame_hi_res(frame: &Mat, term_width: u16, term_height: u16) -> op
             let pixel1: Vec3b = *small_frame.at_2d(row1, col)?;
             let (rf, gf, bf) = (pixel0[2], pixel0[1], pixel0[0]);
             let (rg, gg, bg) = (pixel1[2], pixel1[1], pixel1[0]);
-            write!(frame_str, "\x1B[48;2;{};{};{}m\x1B[38;2;{};{};{}m▀", rg, gg, bg, rf, gf, bf).expect("write failed");
+            write!(frame_str, "\x1B[48;2;{};{};{}m\x1B[38;2;{};{};{}m{}", rg, gg, bg, rf, gf, bf, ch).expect("write failed");
         }
         frame_str.push('\n');
     }
@@ -46,6 +46,16 @@ pub fn render_frame_hi_res(frame: &Mat, term_width: u16, term_height: u16) -> op
     stdout.flush().expect("stdout flush failed");
 
     Ok(())
+}
+
+// ▀ ▄
+
+pub fn render_frame_hi_res_normal(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
+    render_frame_hi_res(frame, term_width, term_height, '▀')
+}
+
+pub fn cheese_grater(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
+    render_frame_hi_res(frame, term_width, term_height, '▄')
 }
 
 pub fn render_frame_lo_res(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
