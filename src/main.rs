@@ -51,7 +51,6 @@ fn duration_from_fps(fps: f64) -> Duration {
 
 fn main() -> opencv::Result<()> {
     let args: Cli = Cli::parse();
-    // Debug: show OpenCV build info
     let video_path: &str = args.path.as_str();
 
     // Open the video file
@@ -59,7 +58,6 @@ fn main() -> opencv::Result<()> {
         video_path,
         CAP_FFMPEG,
     )?;
-    //let mut cap: VideoCapture = VideoCapture::from_file("https://www.youtube.com/watch?v=SXySxLgCV-8", CAP_ANY)?;
     if !cap.is_opened()? {
         panic!("Failed to open video file");
     }
@@ -79,6 +77,7 @@ fn main() -> opencv::Result<()> {
             term_height = (term_height * 2) - 1;
         }
 
+    // pick a render function to use
     let render_function: Box<dyn Fn(&Mat, u16, u16) -> opencv::Result<()>> = match args.graphics_mode.as_str() {
         "high" => Box::new(hires::render),
         "cheesegrater" => Box::new(hires::cheese_grater),
@@ -87,12 +86,15 @@ fn main() -> opencv::Result<()> {
         _ => Box::new(lowres::render),  // low
     };
 
+    // create a new frame
     let mut frame: Mat = Mat::default();
 
     // start playing audio (if enabled)
     let _stream: Option<rodio::OutputStream> = if !args.no_audio {
         Some(audio::start_audio(video_path).expect("audio failed to start"))
     } else { None };
+
+    // start drawing shit
     loop {
         let read_start = Instant::now();
         if !cap.read(&mut frame)? || frame.empty() {

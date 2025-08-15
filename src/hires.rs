@@ -7,6 +7,9 @@ use opencv::{
     prelude::*,
 };
 
+/// renders using foreground and background colours, for this to work right, ch is typically `▄`
+/// 
+/// supports true-colour
 pub fn render_frame_hi_res(frame: &Mat, term_width: u16, term_height: u16, ch: char) -> opencv::Result<()> {
     let mut small_frame = Mat::default();
     resize(
@@ -45,10 +48,12 @@ pub fn render_frame_hi_res(frame: &Mat, term_width: u16, term_height: u16, ch: c
 
 // ▀ ▄
 
+/// literally only needed because of cheese_grater()
 pub fn render(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
     render_frame_hi_res(frame, term_width, term_height, '▀')
 }
 
+/// this function is a fucking joke
 pub fn cheese_grater(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
     render_frame_hi_res(frame, term_width, term_height, '▄')
 }

@@ -7,6 +7,9 @@ use opencv::{
     prelude::*,
 };
 
+/// renders using the ` ` (space) character and background colours
+/// 
+/// supports true-colour
 pub fn render(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
     let mut small_frame = Mat::default();
     resize(

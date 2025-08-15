@@ -6,15 +6,26 @@ use opencv::{
 };
 use crate::sixelbw::{
     sixel_is_on_bw,
-    draw_sixel_col,
+    print_pixels,
+    begin_sixel_bw,
+    end_sixel_bw
 };
 
+/// see `sixelbw::make_sixel_render_bw`
 pub fn make_sixel_render_bw2(adjust: i8) -> impl Fn(&Mat, u16, u16) -> opencv::Result<()> {
     move |frame: &Mat, w: u16, h: u16| {
         render(frame, w, h, adjust)
     }
 }
 
+/// sixelbw2 produces better results than the sixelbw algorithm at the cost
+/// of speed and oftentimes resolution.
+/// 
+/// calculates the average brightness of the frame, adjusts it by
+/// `adjust`, then compares against that value to determine if the sixel is on
+/// or off.
+/// 
+/// black-and-white only
 pub fn render(frame: &Mat, term_width: u16, term_height: u16, adjust: i8) -> opencv::Result<()> {
     let mut small_frame = Mat::default();
     resize(
@@ -25,14 +36,15 @@ pub fn render(frame: &Mat, term_width: u16, term_height: u16, adjust: i8) -> ope
         0.0,
         INTER_LINEAR,
     )?;
-    print!("\x1b[H"); // move cursor home
-    print!("\x1BPq");  // enter sixel
+    begin_sixel_bw();
+
     let height: i32 = small_frame.rows();
     let width: i32 = small_frame.cols();
     let total_px: i32 = width * height;
 
     let mut stdout = stdout();
 
+    // calculate the average brightness
     let mut avg_brightness_acc: i32 = 0;
     for x in 0..width {
         for y in 0..height {
@@ -44,13 +56,10 @@ pub fn render(frame: &Mat, term_width: u16, term_height: u16, adjust: i8) -> ope
     avg_brightness_acc /= total_px as i32;
     avg_brightness_acc += adjust as i32;
 
-    // what the fuck is happening anymore
     // for each vertical band of 6 pixels
     for y_start in (0..height).step_by(6) {
-        let colour_reg = 1;  // FIXED for this band
         for x in 0..width {
             let mut pixels: [bool; 6] = [false; 6];
-            let final_colour = Vec3b::from([255, 255, 255]); 
 
             // collect pixels for this vertical band column
             for i in 0..6 {
@@ -58,18 +67,14 @@ pub fn render(frame: &Mat, term_width: u16, term_height: u16, adjust: i8) -> ope
                 if y < height {
                     let pixel_val: Vec3b = *small_frame.at_2d::<Vec3b>(y, x)?;
                     pixels[i as usize] = sixel_is_on_bw(pixel_val, avg_brightness_acc as u8);
-                    //final_colour = Vec3b::from([255, 255, 255]); 
                 }
             }
-            // Use the same colour register for all columns in this band
-            // Use some fixed colour for now, or pick from your palette
-            draw_sixel_col(pixels, final_colour, colour_reg)?;
-            //stdout.flush().unwrap();
+            print_pixels(pixels)?;
         }
-        print!("-");
+        print!("-");  // go down 6 pixels
     }
 
-    print!("\x1b\\");  // exit sixel
+    end_sixel_bw();
     stdout.flush().expect("stdout flush failed");
     Ok(())
 }
