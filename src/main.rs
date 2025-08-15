@@ -9,7 +9,8 @@ use opencv::{
     videoio::{VideoCapture, CAP_FFMPEG, CAP_PROP_FPS, CAP_PROP_POS_FRAMES},
 };
 mod audio;
-mod video;
+mod hires;
+mod lowres;
 mod sixel;
 
 #[derive(Parser)]
@@ -52,7 +53,7 @@ fn main() -> opencv::Result<()> {
 
     // Get playback parameters
     let fps: f64 = cap.get(CAP_PROP_FPS)?;
-    let frame_delay: Duration = video::duration_from_fps(fps);
+    let frame_delay: Duration = hires::duration_from_fps(fps);
 
     // set width/height for frames
     let (mut term_width, mut term_height) = terminal::size().unwrap_or((80, 25));
@@ -66,10 +67,10 @@ fn main() -> opencv::Result<()> {
         }
 
     let render_function: fn(&Mat, u16, u16) -> Result<(), opencv::Error> = match args.graphics_mode.as_str() {
-        "sixel" => sixel::fuck_data_equipment_corperation,
-        "high" => video::render_frame_hi_res_normal,
-        "cheesegrater" => video::cheese_grater,
-        _ => video::render_frame_lo_res,  // low
+        "sixel" => sixel::render,
+        "high" => hires::render,
+        "cheesegrater" => hires::cheese_grater,
+        _ => lowres::render,  // low
     };
 
     let mut frame: Mat = Mat::default();

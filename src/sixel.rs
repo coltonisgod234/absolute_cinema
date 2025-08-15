@@ -37,7 +37,7 @@ fn sixel_is_on(pixel: Vec3b) -> bool {
     brightness > 127
 }
 
-pub fn fuck_data_equipment_corperation(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
+pub fn render(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
     let mut small_frame = Mat::default();
     resize(
         frame,
