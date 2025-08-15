@@ -11,7 +11,9 @@ use opencv::{
 mod audio;
 mod hires;
 mod lowres;
-mod sixel;
+mod sixelbw;
+mod sixelbw2;
+mod statusbar;
 
 #[derive(Parser)]
 struct Cli {
@@ -33,7 +35,18 @@ struct Cli {
     no_status_bar: bool,
 
     #[arg(short='c', long="clear-screen", help="clear the screen before drawing anything")]
-    clear_screen: bool
+    clear_screen: bool,
+
+    #[arg(long="sixelbw-threshold", help="only valid with sixelbw graphics mode", default_value_t=127)]
+    sixelbw_threshold: u8,
+
+    #[arg(long="sixelbw2-adjust-average-brightness", help="only valid with sixelbw2 graphics mode", default_value_t=-10)]
+    sixelbw2_average_brightness_adjust: i8
+}
+
+fn duration_from_fps(fps: f64) -> Duration {
+    assert!(fps > 0.0, "Invalid FPS: {}", fps);
+    return Duration::from_secs_f64(1.0 / fps);
 }
 
 fn main() -> opencv::Result<()> {
@@ -53,7 +66,7 @@ fn main() -> opencv::Result<()> {
 
     // Get playback parameters
     let fps: f64 = cap.get(CAP_PROP_FPS)?;
-    let frame_delay: Duration = hires::duration_from_fps(fps);
+    let frame_delay: Duration = duration_from_fps(fps);
 
     // set width/height for frames
     let (mut term_width, mut term_height) = terminal::size().unwrap_or((80, 25));
@@ -66,11 +79,12 @@ fn main() -> opencv::Result<()> {
             term_height = (term_height * 2) - 1;
         }
 
-    let render_function: fn(&Mat, u16, u16) -> Result<(), opencv::Error> = match args.graphics_mode.as_str() {
-        "sixel" => sixel::render,
-        "high" => hires::render,
-        "cheesegrater" => hires::cheese_grater,
-        _ => lowres::render,  // low
+    let render_function: Box<dyn Fn(&Mat, u16, u16) -> opencv::Result<()>> = match args.graphics_mode.as_str() {
+        "high" => Box::new(hires::render),
+        "cheesegrater" => Box::new(hires::cheese_grater),
+        "sixelbw" => Box::new(sixelbw::make_sixel_render_bw(args.sixelbw_threshold)),
+        "sixelbw2" => Box::new(sixelbw2::make_sixel_render_bw2(args.sixelbw2_average_brightness_adjust)),
+        _ => Box::new(lowres::render),  // low
     };
 
     let mut frame: Mat = Mat::default();
@@ -101,7 +115,7 @@ fn main() -> opencv::Result<()> {
         sleep(sleep_time);
 
         if !args.no_status_bar {
-            print_status_bar!(
+            statusbar::draw_status_bar(
                 frame_read_duration,
                 loop_duration,
                 sleep_time,

@@ -5,11 +5,11 @@ use opencv::{
     prelude::*,
 };
 
-fn rgb_to_sixel_percent(c: u8) -> u8 {
+pub fn rgb_to_sixel_percent(c: u8) -> u8 {
     ((c as f32 / 255.0) * 100.0).round() as u8
 }
 
-fn draw_sixel_col(pixels: [bool;6], colour: Vec3b, register: u8) -> opencv::Result<()> {
+pub fn draw_sixel_col(pixels: [bool;6], colour: Vec3b, register: u8) -> opencv::Result<()> {
     let r: u8 = rgb_to_sixel_percent(colour[2]); // OpenCV stores as BGR, so reverse
     let g: u8 = rgb_to_sixel_percent(colour[1]);
     let b: u8 = rgb_to_sixel_percent(colour[0]);
@@ -31,13 +31,19 @@ fn draw_sixel_col(pixels: [bool;6], colour: Vec3b, register: u8) -> opencv::Resu
     Ok(())
 }
 
-fn sixel_is_on(pixel: Vec3b) -> bool {
+pub fn sixel_is_on_bw(pixel: Vec3b, threshold: u8) -> bool {
     // BGR to brightness
-    let brightness = (0.299 * pixel[2] as f32 + 0.587 * pixel[1] as f32 + 0.114 * pixel[0] as f32) as u8;
-    brightness > 127
+    let brightness: u8 = (0.299 * pixel[2] as f32 + 0.587 * pixel[1] as f32 + 0.114 * pixel[0] as f32) as u8;
+    brightness > threshold
 }
 
-pub fn render(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
+pub fn make_sixel_render_bw(threshold: u8) -> impl Fn(&Mat, u16, u16) -> opencv::Result<()> {
+    move |frame: &Mat, w: u16, h: u16| {
+        render(frame, w, h, threshold)
+    }
+}
+
+pub fn render(frame: &Mat, term_width: u16, term_height: u16, threshold: u8) -> opencv::Result<()> {
     let mut small_frame = Mat::default();
     resize(
         frame,
@@ -66,7 +72,7 @@ pub fn render(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<
                 let y = y_start + i;
                 if y < height {
                     let pixel_val: Vec3b = *small_frame.at_2d::<Vec3b>(y, x)?;
-                    pixels[i as usize] = sixel_is_on(pixel_val);
+                    pixels[i as usize] = sixel_is_on_bw(pixel_val, threshold);
                     //final_colour = Vec3b::from([255, 255, 255]); 
                 }
             }
