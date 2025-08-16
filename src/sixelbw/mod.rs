@@ -1,4 +1,12 @@
-use std::io::{stdout, Write};
+//! reference sixel implementation
+//! 
+//! uses a fixed threshold, unlike `sixelbw2` which dynamically decides it.
+//! this is the basis for writing other sixel implementations.
+//! 
+//! it is not a pratical implementation in and of itself, rather it is a
+//! reference implementation for sixel.
+
+use std::fmt::Write;
 use opencv::{
     core::Vec3b,
     imgproc::{resize, INTER_LINEAR},
@@ -29,35 +37,54 @@ pub fn rgb_to_sixel_percent(c: u8) -> u8 {
     ((c as f32 / 255.0) * 100.0).round() as u8
 }
 
-/// currently dead code!
+/// currenly dead code!
 /// 
 /// changes the colour in a register and draws to the screen
 /// this code is very costly and isn't recomended.
-pub fn draw_sixel_col(pixels: [bool;6], colour: Vec3b, register: u8) -> opencv::Result<()> {
+pub fn draw_sixel_colour(colour: Vec3b, register: u8) -> String {
     let r: u8 = rgb_to_sixel_percent(colour[2]); // OpenCV stores as BGR, so reverse
     let g: u8 = rgb_to_sixel_percent(colour[1]);
     let b: u8 = rgb_to_sixel_percent(colour[0]);
-    let color_index = register;  // always 0 right now
+    let color_index = register;
+    let mut output = String::new();
 
-    print!("#{};2;{};{};{}", color_index, r, g, b);  // define colour
-    print!("#{}", color_index);  // switch to that colour
+    // define colour
+    write!(output, "#{};2;{};{};{}", color_index, r, g, b)
+        .expect("can't write colour reg setup cmd to str");
 
-    return print_pixels(pixels)
+    // switch to that colour
+    write!(output, "#{}", color_index)
+        .expect("can't write colour cahnge cmd to str");
+
+    return output
 }
 
-/// take an array of 6 pixels and preform the math needed to draw them
-/// as sixels to the screen
+/// currently dead code!
 /// 
-/// doesn't update any colour regs
-pub fn print_pixels(pixels: [bool;6]) -> opencv::Result<()> {
+/// COSTLY AS FUCK
+/// drwas 
+pub fn draw_sixel_col(pixels: [bool;6], colour: Vec3b, register: u8) -> () {
+    print!("{}{}", draw_sixel_colour(colour, register), calculate_sixel_cols(pixels));
+    return ()
+}
+
+/// calculates what character to display from a 6-bit array
+pub fn calculate_sixel_cols(pixels: [bool;6]) -> char {
     let mut bits: u8 = 0u8;
     for (idx, on) in pixels.iter().enumerate() {
         if *on {
             bits |= 1 << idx;
         }
     }
-    
-    print!("{}", (bits + 63) as char);
+    return (bits + 63) as char;
+}
+
+/// take an array of 6 pixels and draw them to the screen
+/// as sixels to the screen
+/// 
+/// doesn't update any colour regs
+pub fn print_pixels(pixels: [bool;6]) -> opencv::Result<()> {
+    print!("{}", calculate_sixel_cols(pixels));
     Ok(())
 }
 
@@ -98,7 +125,6 @@ pub fn render(frame: &Mat, term_width: u16, term_height: u16, threshold: u8) -> 
 
     let height: i32 = small_frame.rows();
     let width: i32 = small_frame.cols();
-    let mut stdout = stdout();
 
     // what the fuck is happening anymore
     // for each vertical band of 6 pixels
@@ -114,16 +140,14 @@ pub fn render(frame: &Mat, term_width: u16, term_height: u16, threshold: u8) -> 
                     pixels[i as usize] = sixel_is_on_bw(pixel_val, threshold);
                 }
             }
-            // Use the same colour register for all columns in this band
-            // Use some fixed colour for now, or pick from your palette
-            //draw_sixel_col(pixels, final_colour, colour_reg)?;
             print_pixels(pixels)?;
-            //stdout.flush().unwrap();
         }
         print!("-");
     }
 
     end_sixel_bw();
-    stdout.flush().expect("stdout flush failed");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

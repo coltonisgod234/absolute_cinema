@@ -1,5 +1,5 @@
 use std::{
-    fmt::Write as FmtWrite, io::{stdout, Write}
+    fmt::Write as FmtWrite
 };
 use opencv::{
     core::Vec3b,
@@ -7,10 +7,24 @@ use opencv::{
     prelude::*,
 };
 
+/// literally only needed because of cheese_grater()
+pub fn make_render(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
+    print!("\x1B[H"); // cursor home
+    print!("{}", render_frame_hi_res(frame, term_width, term_height, '▀').unwrap());
+    Ok(())
+}
+
+/// this function is a fucking joke
+pub fn make_cheese_grater(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
+    print!("\x1B[H"); // cursor home
+    print!("{}", render_frame_hi_res(frame, term_width, term_height, '▄').unwrap());
+    Ok(())
+}
+
 /// renders using foreground and background colours, for this to work right, ch is typically `▄`
 /// 
 /// supports true-colour
-pub fn render_frame_hi_res(frame: &Mat, term_width: u16, term_height: u16, ch: char) -> opencv::Result<()> {
+pub fn render_frame_hi_res(frame: &Mat, term_width: u16, term_height: u16, ch: char) -> opencv::Result<String> {
     let mut small_frame = Mat::default();
     resize(
         frame,
@@ -38,22 +52,11 @@ pub fn render_frame_hi_res(frame: &Mat, term_width: u16, term_height: u16, ch: c
         frame_str.pop(); // prevent vertical jitter
     }
 
-    let mut stdout = stdout();
-    print!("\x1B[H"); // cursor home
-    write!(stdout, "{}", frame_str).expect("stdout write failed");
-    stdout.flush().expect("stdout flush failed");
-
-    Ok(())
+    Ok(frame_str)
 }
 
 // ▀ ▄
 
-/// literally only needed because of cheese_grater()
-pub fn render(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
-    render_frame_hi_res(frame, term_width, term_height, '▀')
-}
-
-/// this function is a fucking joke
-pub fn cheese_grater(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
-    render_frame_hi_res(frame, term_width, term_height, '▄')
-}
+// unit testing
+#[cfg(test)]
+mod tests;

@@ -1,5 +1,5 @@
 use std::{
-    fmt::Write as FmtWrite, io::{stdout, Write}
+    fmt::Write as FmtWrite
 };
 use opencv::{
     core::Vec3b,
@@ -7,10 +7,16 @@ use opencv::{
     prelude::*,
 };
 
+pub fn make_render(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
+    print!("\x1B[H"); // cursor home
+    print!("{}", lowres(frame, term_width, term_height).unwrap());
+    Ok(())
+}
+
 /// renders using the ` ` (space) character and background colours
 /// 
 /// supports true-colour
-pub fn render(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
+fn lowres(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<String> {
     let mut small_frame = Mat::default();
     resize(
         frame,
@@ -34,10 +40,8 @@ pub fn render(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<
         frame_str.pop(); // prevent vertical jitter
     }
 
-    let mut stdout = stdout();
-    print!("\x1B[H"); // cursor home
-    write!(stdout, "{}", frame_str).expect("stdout write failed");
-    stdout.flush().expect("stdout flush failed");
-
-    Ok(())
+    Ok(frame_str)
 }
+
+#[cfg(test)]
+mod tests;

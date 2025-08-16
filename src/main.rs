@@ -23,7 +23,7 @@ struct Cli {
     no_audio: bool,
 
     #[arg(short='g', long="graphics", help="graphics mode", default_value="high")]
-    graphics_mode: String,
+    graphics: String,
 
     #[arg(short='W', long="width", help="resize the image to this width")]
     width: Option<u16>,
@@ -49,6 +49,20 @@ fn duration_from_fps(fps: f64) -> Duration {
     return Duration::from_secs_f64(1.0 / fps);
 }
 
+fn autodetect_term_size(args: &Cli) -> (u16, u16) {
+    let (term_width, mut term_height) = terminal::size().unwrap_or((80, 25));
+    term_height = match args.graphics.as_ref() {
+        "high" => term_height * 2,
+        _ => term_height
+    };
+
+    if !args.no_status_bar {
+        // if using status bar decrease by 1 to account
+        term_height -= 1;
+    }
+    return (term_width, term_height);
+}
+
 fn main() -> opencv::Result<()> {
     let args: Cli = Cli::parse();
     let video_path: &str = args.path.as_str();
@@ -67,23 +81,16 @@ fn main() -> opencv::Result<()> {
     let frame_delay: Duration = duration_from_fps(fps);
 
     // set width/height for frames
-    let (mut term_width, mut term_height) = terminal::size().unwrap_or((80, 25));
-    if args.width.is_some() { term_width = args.width.unwrap(); }
-    if args.height.is_some() { term_height = args.height.unwrap(); }
-    if args.width.is_none()
-        && args.graphics_mode == "high"
-        || args.graphics_mode == "cheesegrater"
-        {
-            term_height = (term_height * 2) - 1;
-        }
+    let term_width = args.width.unwrap_or_else(|| autodetect_term_size(&args).0);
+    let term_height = args.height.unwrap_or_else(|| autodetect_term_size(&args).1);
 
     // pick a render function to use
-    let render_function: Box<dyn Fn(&Mat, u16, u16) -> opencv::Result<()>> = match args.graphics_mode.as_str() {
-        "high" => Box::new(hires::render),
-        "cheesegrater" => Box::new(hires::cheese_grater),
+    let render_function: Box<dyn Fn(&Mat, u16, u16) -> opencv::Result<()>> = match args.graphics.as_str() {
+        "high" => Box::new(hires::make_render),
+        "cheesegrater" => Box::new(hires::make_cheese_grater),
         "sixelbw" => Box::new(sixelbw::make_sixel_render_bw(args.sixelbw_threshold)),
         "sixelbw2" => Box::new(sixelbw2::make_sixel_render_bw2(args.sixelbw2_average_brightness_adjust)),
-        _ => Box::new(lowres::render),  // low
+        _ => Box::new(lowres::make_render),  // low
     };
 
     // create a new frame
@@ -130,4 +137,18 @@ fn main() -> opencv::Result<()> {
 
     println!("video done, terminating");
     Ok(())
+}
+
+// unit testing
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_duration_from_fps() {
+        let test_60: Duration = duration_from_fps(60.0);
+        assert_eq!(test_60.as_millis(), 16);
+
+        let test_30: Duration = duration_from_fps(30.0);
+        assert_eq!(test_30.as_millis(), 33);
+    }
 }
