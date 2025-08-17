@@ -7,18 +7,13 @@ use opencv::{
     prelude::*,
 };
 
-/// literally only needed because of cheese_grater()
-pub fn make_render(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
-    print!("\x1B[H"); // cursor home
-    print!("{}", render_frame_hi_res(frame, term_width, term_height, '▀').unwrap());
-    Ok(())
-}
-
-/// this function is a fucking joke
-pub fn make_cheese_grater(frame: &Mat, term_width: u16, term_height: u16) -> opencv::Result<()> {
-    print!("\x1B[H"); // cursor home
-    print!("{}", render_frame_hi_res(frame, term_width, term_height, '▄').unwrap());
-    Ok(())
+/// creates a closure that calls this module's render() with correct params
+pub fn make_render(ch: char) -> impl Fn(&Mat, u16, u16) -> opencv::Result<()> {
+    move |frame: &Mat, w: u16, h: u16| {
+        print!("\x1B[H"); // cursor home
+        print!("{}", render_frame_hi_res(frame, w, h, ch).unwrap());
+        Ok(())
+    }
 }
 
 /// renders using foreground and background colours, for this to work right, ch is typically `▄`

@@ -14,6 +14,7 @@ mod lowres;
 mod sixelbw;
 mod sixelbw2;
 mod statusbar;
+mod braillebw;
 
 #[derive(Parser)]
 struct Cli {
@@ -37,6 +38,13 @@ struct Cli {
     #[arg(short='c', long="clear-screen", help="clear the screen before drawing anything")]
     clear_screen: bool,
 
+    // graphics options
+    #[arg(long="high-char", help="picks the char for high graphics mode", default_value_t='▀')]
+    high_graphics_character: char,
+
+    #[arg(long="low-char", help="picks the char for low graphics mode", default_value_t=' ')]
+    low_graphics_character: char,
+
     #[arg(long="sixelbw-threshold", help="only valid with sixelbw graphics mode", default_value_t=127)]
     sixelbw_threshold: u8,
 
@@ -50,14 +58,21 @@ fn duration_from_fps(fps: f64) -> Duration {
 }
 
 fn autodetect_term_size(args: &Cli) -> (u16, u16) {
-    let (term_width, mut term_height) = terminal::size().unwrap_or((80, 25));
+    let (mut term_width, mut term_height) = terminal::size()
+        .unwrap_or((80, 25));
+
     term_height = match args.graphics.as_ref() {
         "high" => term_height * 2,
+        "braillebw" => term_height * 2 -1,
         _ => term_height
     };
 
-    if !args.no_status_bar {
-        // if using status bar decrease by 1 to account
+    term_width = match args.graphics.as_ref() {
+        "braillebw" => term_width * 4,
+        _ => term_height
+    };
+
+    if !args.no_status_bar { // if using status bar decrease by 1 to make room
         term_height -= 1;
     }
     return (term_width, term_height);
@@ -86,11 +101,13 @@ fn main() -> opencv::Result<()> {
 
     // pick a render function to use
     let render_function: Box<dyn Fn(&Mat, u16, u16) -> opencv::Result<()>> = match args.graphics.as_str() {
-        "high" => Box::new(hires::make_render),
-        "cheesegrater" => Box::new(hires::make_cheese_grater),
+        "high" => Box::new(hires::make_render(args.high_graphics_character)),
+        "cheesegrater" => Box::new(hires::make_render('▄')),
         "sixelbw" => Box::new(sixelbw::make_sixel_render_bw(args.sixelbw_threshold)),
         "sixelbw2" => Box::new(sixelbw2::make_sixel_render_bw2(args.sixelbw2_average_brightness_adjust)),
-        _ => Box::new(lowres::make_render),  // low
+        "low" => Box::new(lowres::make_render),
+        "braillebw" => Box::new(braillebw::make_render),
+        _ => panic!("unrecognized renderer")
     };
 
     // create a new frame
