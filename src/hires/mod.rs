@@ -1,57 +1,51 @@
+//! renders using foreground and background colours, for this to work right, ch is typically `▄`
+//! 
+//! supports true-colour
+
 use std::{
     fmt::Write as FmtWrite
 };
 use opencv::{
     core::Vec3b,
-    imgproc::{resize, INTER_LINEAR},
     prelude::*,
 };
+use crate::video::{Renderable, Renderer};
 
-/// creates a closure that calls this module's render() with correct params
-pub fn make_render(ch: char) -> impl Fn(&Mat, u16, u16) -> opencv::Result<()> {
-    move |frame: &Mat, w: u16, h: u16| {
-        print!("\x1B[H"); // cursor home
-        print!("{}", render_frame_hi_res(frame, w, h, ch).unwrap());
-        Ok(())
-    }
+pub struct HighRes {
+    pub ch: char
 }
 
-/// renders using foreground and background colours, for this to work right, ch is typically `▄`
-/// 
-/// supports true-colour
-pub fn render_frame_hi_res(frame: &Mat, term_width: u16, term_height: u16, ch: char) -> opencv::Result<String> {
-    let mut small_frame = Mat::default();
-    resize(
-        frame,
-        &mut small_frame,
-        opencv::core::Size { width: term_width as i32, height: term_height as i32 },
-        0.0,
-        0.0,
-        INTER_LINEAR,
-    )?;
+impl Renderer for HighRes {
+    fn draw(&mut self, frame: &Mat) -> opencv::Result<Box<dyn Renderable>> {
+        let mut frame_str = String::new();
 
-    let mut frame_str = String::new();
-    for row0 in (0..small_frame.rows()).step_by(2) {
-        let row1 = row0 + 1;
-        if row1 >= small_frame.rows() {break;}
-        for col in 0..small_frame.cols() {
-            let pixel0: Vec3b = *small_frame.at_2d(row0, col)?;
-            let pixel1: Vec3b = *small_frame.at_2d(row1, col)?;
-            let (rf, gf, bf) = (pixel0[2], pixel0[1], pixel0[0]);
-            let (rg, gg, bg) = (pixel1[2], pixel1[1], pixel1[0]);
-            write!(frame_str, "\x1B[48;2;{};{};{}m\x1B[38;2;{};{};{}m{}", rg, gg, bg, rf, gf, bf, ch).expect("write failed");
+        for row0 in (0..frame.rows()).step_by(2) {
+            let row1 = row0 + 1;
+            if row1 >= frame.rows() {
+                break;
+            }
+
+            for col in 0..frame.cols() {
+                let pixel0: Vec3b = *frame.at_2d(row0, col)?;
+                let pixel1: Vec3b = *frame.at_2d(row1, col)?;
+
+                let (rf, gf, bf) = (pixel0[2], pixel0[1], pixel0[0]);
+                let (rg, gg, bg) = (pixel1[2], pixel1[1], pixel1[0]);
+                write!(frame_str, "\x1B[48;2;{};{};{}m\x1B[38;2;{};{};{}m{}", rg, gg, bg, rf, gf, bf, self.ch).expect("write failed");
+            }
+            frame_str.push('\n');
         }
-        frame_str.push('\n');
-    }
-    if frame_str.ends_with('\n') {
-        frame_str.pop(); // prevent vertical jitter
-    }
+        if frame_str.ends_with('\n') {
+            frame_str.pop(); // prevent vertical jitter
+        }
 
-    Ok(frame_str)
+        Ok(Box::new(frame_str))
+    }
 }
 
 // ▀ ▄
 
-// unit testing
+/* unit testing
 #[cfg(test)]
 mod tests;
+*/

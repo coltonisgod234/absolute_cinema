@@ -7,18 +7,28 @@ use crossterm::terminal;
 use opencv::{
     prelude::*,
     videoio::{VideoCapture, CAP_FFMPEG, CAP_PROP_FPS, CAP_PROP_POS_FRAMES},
+    imgproc::{resize, INTER_LINEAR},
 };
+
+use crate::video::{Renderable, Renderer};
 mod audio;
 
 // graphics modes
 mod hires;
 mod lowres;
+
+// SIXEL rendering
+mod sixel;
 mod sixelbw;
 mod sixelbw2;
+
+// braille rendering
+mod braille;
 mod braillebw;
 mod braillergb;
 
 mod statusbar;
+mod video;
 
 #[derive(Parser)]
 struct Cli {
@@ -39,9 +49,6 @@ struct Cli {
     #[arg(short='s', long="no-status-bar", help="don't print the status bar")]
     no_status_bar: bool,
 
-    #[arg(short='c', long="clear-screen", help="clear the screen before drawing anything")]
-    clear_screen: bool,
-
     // graphics options
     #[arg(long="high-char", help="picks the char for high graphics mode", default_value_t='▀')]
     high_graphics_character: char,
@@ -50,10 +57,10 @@ struct Cli {
     low_graphics_character: char,
 
     #[arg(long="sixelbw-threshold", help="only valid with sixelbw graphics mode", default_value_t=127)]
-    sixelbw_threshold: u8,
+    threshold: u8,
 
     #[arg(long="sixelbw2-adjust-average-brightness", help="only valid with sixelbw2 graphics mode", default_value_t=-10)]
-    sixelbw2_average_brightness_adjust: i8
+    sixelbw2_adjust: i8
 }
 
 /// determines the `Duration` to wait from a target `fps`
@@ -107,19 +114,31 @@ fn main() -> opencv::Result<()> {
     let term_height: u16 = args.height.unwrap_or_else(|| autodetect_term_size(&args).1);
 
     // pick a render function to use
-    let render_function: Box<dyn Fn(&Mat, u16, u16) -> opencv::Result<()>> = match args.graphics.as_str() {
-        "high" => Box::new(hires::make_render(args.high_graphics_character)),
-        "cheesegrater" => Box::new(hires::make_render('▄')),
-        "sixelbw" => Box::new(sixelbw::make_sixel_render_bw(args.sixelbw_threshold)),
-        "sixelbw2" => Box::new(sixelbw2::make_sixel_render_bw2(args.sixelbw2_average_brightness_adjust)),
-        "low" => Box::new(lowres::make_render),
-        "braillebw" => Box::new(braillebw::make_render),
-        "braillergb" => Box::new(braillergb::make_render),
+    let mut renderer: Box<dyn Renderer> = match args.graphics.as_str() {
+        "braillebw" => Box::new(braillebw::Braillebw {
+            threshold: args.threshold
+        }),
+        "braillergb" => Box::new(braillergb::BrailleRGB {
+            threshold: args.threshold
+        }),
+        "high" => Box::new(hires::HighRes {
+            ch: args.high_graphics_character
+        }),
+        "low" => Box::new(lowres::LowRes {
+            ch: args.low_graphics_character
+        }),
+        "sixelbw" => Box::new(sixelbw::SixelMono {
+            threshold: args.threshold
+        }),
+        "sixelbw2" => Box::new(sixelbw2::SixelMono2 {
+            adjust: args.sixelbw2_adjust
+        }),
         _ => panic!("unrecognized renderer")
     };
 
     // create a new frame
-    let mut frame: Mat = Mat::default();
+    let mut orig_frame: Mat = Mat::default();
+    let mut frame: Mat = Mat::default();  // resized frame
 
     // start playing audio (if enabled)
     let _stream: Option<rodio::OutputStream> = if !args.no_audio {
@@ -128,26 +147,41 @@ fn main() -> opencv::Result<()> {
 
     // start drawing shit
     loop {
+        // read the frame
         let read_start = Instant::now();
-        if !cap.read(&mut frame)? || frame.empty() {
+        if !cap.read(&mut orig_frame)? || orig_frame.empty() {
+            eprintln!("failed to read (is the video done?)");
             break;
         }
         let read_end = Instant::now();
         let frame_read_duration = read_end - read_start;
 
+        // the loop actually starts here
         let loop_start = Instant::now();
 
-        if args.clear_screen {
-            print!("\x1B[2J");
-        }
-        render_function(&mut frame, term_width, term_height)?;
+        // resize it to the user's wishes
+        resize(
+            &orig_frame,
+            &mut frame,
+            opencv::core::Size { width: term_width as i32, height: term_height as i32 },
+            0.0,
+            0.0,
+            INTER_LINEAR,
+        )?;
+
+        // draw the frame
+        let output: Box<dyn Renderable> = renderer.draw(&frame)?;
+        output.render();
 
         let loop_end = Instant::now();
         let loop_duration = loop_end - loop_start;
         let total_loop_duration = frame_read_duration + loop_duration;
         let sleep_time = frame_delay.checked_sub(total_loop_duration).unwrap_or(Duration::ZERO);
+        
+        // wait
         sleep(sleep_time);
 
+        // draw the status bar
         if !args.no_status_bar {
             statusbar::draw_status_bar(
                 frame_read_duration,
