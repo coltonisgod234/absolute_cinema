@@ -9,12 +9,16 @@ use opencv::{
     videoio::{VideoCapture, CAP_FFMPEG, CAP_PROP_FPS, CAP_PROP_POS_FRAMES},
 };
 mod audio;
+
+// graphics modes
 mod hires;
 mod lowres;
 mod sixelbw;
 mod sixelbw2;
-mod statusbar;
 mod braillebw;
+mod braillergb;
+
+mod statusbar;
 
 #[derive(Parser)]
 struct Cli {
@@ -52,24 +56,27 @@ struct Cli {
     sixelbw2_average_brightness_adjust: i8
 }
 
+/// determines the `Duration` to wait from a target `fps`
 fn duration_from_fps(fps: f64) -> Duration {
     assert!(fps > 0.0, "Invalid FPS: {}", fps);
     return Duration::from_secs_f64(1.0 / fps);
 }
 
+/// determines an appropriate image size based on the command line args
 fn autodetect_term_size(args: &Cli) -> (u16, u16) {
     let (mut term_width, mut term_height) = terminal::size()
         .unwrap_or((80, 25));
 
     term_height = match args.graphics.as_ref() {
-        "high" => term_height * 2,
-        "braillebw" => term_height * 2 -1,
+        "high" | "cheesegrater" => (term_height * 2) - 1,
+        "braillebw" | "braillergb" => (term_height * 2) - 1,
+        "sixelbw" | "sixelbw2" => (term_height * 6) - 1,
         _ => term_height
     };
 
     term_width = match args.graphics.as_ref() {
-        "braillebw" => term_width * 4,
-        _ => term_height
+        "braillebw" | "braillergb" => term_width * 4,
+        _ => term_width
     };
 
     if !args.no_status_bar { // if using status bar decrease by 1 to make room
@@ -96,8 +103,8 @@ fn main() -> opencv::Result<()> {
     let frame_delay: Duration = duration_from_fps(fps);
 
     // set width/height for frames
-    let term_width = args.width.unwrap_or_else(|| autodetect_term_size(&args).0);
-    let term_height = args.height.unwrap_or_else(|| autodetect_term_size(&args).1);
+    let term_width: u16 = args.width.unwrap_or_else(|| autodetect_term_size(&args).0);
+    let term_height: u16 = args.height.unwrap_or_else(|| autodetect_term_size(&args).1);
 
     // pick a render function to use
     let render_function: Box<dyn Fn(&Mat, u16, u16) -> opencv::Result<()>> = match args.graphics.as_str() {
@@ -107,6 +114,7 @@ fn main() -> opencv::Result<()> {
         "sixelbw2" => Box::new(sixelbw2::make_sixel_render_bw2(args.sixelbw2_average_brightness_adjust)),
         "low" => Box::new(lowres::make_render),
         "braillebw" => Box::new(braillebw::make_render),
+        "braillergb" => Box::new(braillergb::make_render),
         _ => panic!("unrecognized renderer")
     };
 

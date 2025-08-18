@@ -4,14 +4,14 @@ use opencv::{
     prelude::*,
 };
 
-fn calc_brightness(pixel: Vec3b) -> u8 {
+pub fn calc_brightness(pixel: Vec3b) -> u8 {
     return (
         0.299 * pixel[2] as f32
         + 0.587 * pixel[1] as f32
         + 0.114 * pixel[0] as f32) as u8;
 }
 
-fn find_codepoint(pixels: [bool;8]) -> char {
+pub fn find_codepoint(pixels: [bool;8]) -> char {
     let mut bits = 0u8;
     for (idx, on) in pixels.iter().enumerate() {
         if *on {
@@ -21,7 +21,7 @@ fn find_codepoint(pixels: [bool;8]) -> char {
     return char::from_u32(0x2800 + bits as u32).expect("expected codepoint")
 }
 
-fn pixel_on(brightness: u8, threshold: u8) -> bool {
+pub fn pixel_on(brightness: u8, threshold: u8) -> bool {
     return brightness > threshold
 }
 

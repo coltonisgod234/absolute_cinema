@@ -1,0 +1,25 @@
+warning: function `rgb_to_sixel_percent` is never used
+  --> src/sixelbw/mod.rs:36:8
+   |
+36 | pub fn rgb_to_sixel_percent(c: u8) -> u8 {
+   |        ^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` on by default
+
+warning: function `draw_sixel_colour` is never used
+  --> src/sixelbw/mod.rs:44:8
+   |
+44 | pub fn draw_sixel_colour(colour: Vec3b, register: u8) -> String {
+   |        ^^^^^^^^^^^^^^^^^
+
+warning: function `draw_sixel_col` is never used
+  --> src/sixelbw/mod.rs:66:8
+   |
+66 | pub fn draw_sixel_col(pixels: [bool;6], colour: Vec3b, register: u8) -> () {
+   |        ^^^^^^^^^^^^^^
+
+warning: `absolute_cinema` (bin "absolute_cinema") generated 3 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running `target/debug/absolute_cinema resources/peak.mp4 -g sixelbw2 -W 640 -H 480`
+Dropping OutputStream, audio playing through this stream will stop
+Error: Error { code: "StsOutOfRange, -211", message: "Index: 360 along dimension: 0 out of bounds 0..360" }

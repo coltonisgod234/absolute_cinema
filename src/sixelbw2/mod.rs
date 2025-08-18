@@ -8,22 +8,25 @@
 //! 
 //! requires `sixelbw`
 
+use rayon::prelude::*;
 use opencv::{
     core::Vec3b,
     imgproc::{resize, INTER_LINEAR},
     prelude::*,
 };
 use crate::sixelbw::{
-    sixel_is_on_bw,
-    print_pixels,
-    begin_sixel_bw,
-    end_sixel_bw
+    begin_sixel_bw, calculate_sixel_cols, end_sixel_bw, sixel_is_on_bw
 };
 
 /// see `sixelbw::make_sixel_render_bw`
 pub fn make_sixel_render_bw2(adjust: i8) -> impl Fn(&Mat, u16, u16) -> opencv::Result<()> {
     move |frame: &Mat, w: u16, h: u16| {
-        render(frame, w, h, adjust)
+        let text: String = render(frame, w, h, adjust)?;
+        print!("\x1B[H");
+        begin_sixel_bw();
+        print!("{}", text);
+        end_sixel_bw();
+        Ok(())
     }
 }
 
@@ -32,6 +35,7 @@ pub fn calc_avg_brightness(frame: &Mat, width: i32, height: i32, adjust: i8) -> 
     // calculate the average brightness
     let total_px: i32 = width * height;
     let mut avg_brightness_acc: i32 = 0;
+
     for x in 0..width {
         for y in 0..height {
             let pixel: Vec3b = *frame.at_2d::<Vec3b>(y, x)?;  // BGR
@@ -50,7 +54,7 @@ pub fn calc_avg_brightness(frame: &Mat, width: i32, height: i32, adjust: i8) -> 
 
 /// sixelbw2 produces better results than the sixelbw algorithm at the cost
 /// of speed and oftentimes resolution.
-pub fn render(frame: &Mat, term_width: u16, term_height: u16, adjust: i8) -> opencv::Result<()> {
+pub fn render(frame: &Mat, term_width: u16, term_height: u16, adjust: i8) -> opencv::Result<String> {
     let mut small_frame = Mat::default();
     resize(
         frame,
@@ -60,14 +64,16 @@ pub fn render(frame: &Mat, term_width: u16, term_height: u16, adjust: i8) -> ope
         0.0,
         INTER_LINEAR,
     )?;
-    begin_sixel_bw();
 
     let height: i32 = small_frame.rows();
     let width: i32 = small_frame.cols();
     let average_brightness: i32 = calc_avg_brightness(&frame, width, height, adjust)?;
 
+    let slices: Vec<_> = (0..height).step_by(6).collect();
+
     // for each vertical band of 6 pixels
-    for y_start in (0..height).step_by(6) {
+    let chunks: Vec<String> = slices.par_iter().map(|&y_start| {
+        let mut chunk = String::new();
         for x in 0..width {
             let mut pixels: [bool; 6] = [false; 6];
 
@@ -75,18 +81,17 @@ pub fn render(frame: &Mat, term_width: u16, term_height: u16, adjust: i8) -> ope
             for i in 0..6 {
                 let y = y_start + i;
                 if y < height {
-                    let pixel_val: Vec3b = *small_frame.at_2d::<Vec3b>(y, x)?;
+                    let pixel_val: Vec3b = *small_frame.at_2d::<Vec3b>(y, x)
+                        .expect("failed to get pixel colour");
+
                     pixels[i as usize] = sixel_is_on_bw(pixel_val, average_brightness as u8);
                 }
             }
-            print_pixels(pixels)?;
+            chunk.push(calculate_sixel_cols(pixels));
         }
-        print!("-");  // go down 6 pixels
-    }
+        return chunk
+    }).collect();
 
-    end_sixel_bw();
-    Ok(())
+    let text = chunks.join("-");
+    Ok(text)
 }
-
-#[cfg(test)]
-mod tests;
