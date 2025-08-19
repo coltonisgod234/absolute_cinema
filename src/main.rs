@@ -5,9 +5,9 @@ use std::{
 use clap::Parser;
 use crossterm::terminal;
 use opencv::{
+    imgproc::{resize, INTER_NEAREST},
     prelude::*,
-    videoio::{VideoCapture, CAP_FFMPEG, CAP_PROP_FPS, CAP_PROP_POS_FRAMES},
-    imgproc::{resize, INTER_LINEAR},
+    videoio::{VideoCapture, CAP_FFMPEG, CAP_PROP_FPS, CAP_PROP_POS_FRAMES}
 };
 
 use crate::video::{Renderable, Renderer};
@@ -21,6 +21,7 @@ mod lowres;
 mod sixel;
 mod sixelbw;
 mod sixelbw2;
+mod sixelrgb;
 
 // braille rendering
 mod braille;
@@ -56,11 +57,14 @@ struct Cli {
     #[arg(long="low-char", help="picks the char for low graphics mode", default_value_t=' ')]
     low_graphics_character: char,
 
-    #[arg(long="sixelbw-threshold", help="only valid with sixelbw graphics mode", default_value_t=127)]
+    #[arg(long="threshold", help="only valid with sixelbw graphics mode", default_value_t=127)]
     threshold: u8,
 
-    #[arg(long="sixelbw2-adjust-average-brightness", help="only valid with sixelbw2 graphics mode", default_value_t=-10)]
-    sixelbw2_adjust: i8
+    #[arg(long="adjust", help="only valid with sixelbw2 graphics mode", default_value_t=0)]
+    adjust: i8,
+
+    #[arg(long="adjust-alpha", help="only valid with sixelbw2 graphics mode", default_value_t=0.5)]
+    alpha: f32
 }
 
 /// determines the `Duration` to wait from a target `fps`
@@ -130,8 +134,39 @@ fn main() -> opencv::Result<()> {
         "sixelbw" => Box::new(sixelbw::SixelMono {
             threshold: args.threshold
         }),
-        "sixelbw2" => Box::new(sixelbw2::SixelMono2 {
-            adjust: args.sixelbw2_adjust
+        "sixelbw2" => Box::new(sixelbw2::SixelMono2::new(
+            args.adjust,
+            args.alpha
+        )),
+        "sixelrgb" => Box::new(sixelrgb::SixelGreyscale::new(
+            vec![
+                (000,000,000),  // black
+
+                // some colours
+                (127,000,000),  // dark red
+                (255,000,000),  // bright red
+                (000,127,000),  // dark green
+                (000,255,000),  // bright green
+                (000,000,127),  // dark blue
+                (000,000,255),  // bright blue
+
+                // colour combinations
+                (127,000,127),  // purple I think??
+                (255,000,255),  // PURPLE????
+
+                (127,127,000),  // orange I think??
+                (255,255,000),  // ORANGE????
+
+                (000,127,127),  // some weird "aqua"
+                (000,255,255),  // ?????????????????????????
+
+                (255,255,255),  // white
+            ],
+            args.adjust,
+            args.alpha
+        )),
+        "cheesegrater" => Box::new(hires::HighRes {
+            ch: '▄'
         }),
         _ => panic!("unrecognized renderer")
     };
@@ -166,7 +201,7 @@ fn main() -> opencv::Result<()> {
             opencv::core::Size { width: term_width as i32, height: term_height as i32 },
             0.0,
             0.0,
-            INTER_LINEAR,
+            INTER_NEAREST,
         )?;
 
         // draw the frame
