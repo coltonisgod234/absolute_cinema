@@ -57,14 +57,55 @@ struct Cli {
     #[arg(long="low-char", help="picks the char for low graphics mode", default_value_t=' ')]
     low_graphics_character: char,
 
-    #[arg(long="threshold", help="only valid with sixelbw graphics mode", default_value_t=127)]
+    #[arg(long="threshold", default_value_t=127)]
     threshold: u8,
 
-    #[arg(long="adjust", help="only valid with sixelbw2 graphics mode", default_value_t=0)]
+    #[arg(long="adjust", default_value_t=0)]
     adjust: i8,
 
-    #[arg(long="adjust-alpha", help="only valid with sixelbw2 graphics mode", default_value_t=0.5)]
-    alpha: f32
+    #[arg(long="adjust-alpha", default_value_t=0.5)]
+    alpha: f32,
+
+    #[arg(short='c', long="colour", value_parser=parse_rgb)]
+    colours: Option<Vec<(u8,u8,u8)>>
+}
+
+/// a default palette to use when none is specified
+fn default_palette() -> Vec<(u8,u8,u8)> {
+    vec![
+        (000,000,000),  // black
+
+        // some colours
+        (127,000,000),  // dark red
+        (255,000,000),  // bright red
+        (000,127,000),  // dark green
+        (000,255,000),  // bright green
+        (000,000,127),  // dark blue
+        (000,000,255),  // bright blue
+
+        // colour combinations
+        (127,000,127),  // purple I think??
+        (255,000,255),  // PURPLE????
+
+        (127,127,000),  // orange I think??
+        (255,255,000),  // ORANGE????
+
+        (000,127,127),  // some weird "aqua"
+        (000,255,255),  // ?????????????????????????
+
+        (255,255,255),  // white
+    ]
+}
+
+fn parse_rgb(s: &str) -> Result<(u8,u8,u8), String> {
+    let parts: Vec<_> = s.split(',').collect();
+    if parts.len() != 3 {
+        return Err(format!("Expected 3 comma-separated numbers, got '{}'", s));
+    }
+    let r = parts[0].parse::<u8>().map_err(|_| format!("Invalid number '{}'", parts[0]))?;
+    let g = parts[1].parse::<u8>().map_err(|_| format!("Invalid number '{}'", parts[1]))?;
+    let b = parts[2].parse::<u8>().map_err(|_| format!("Invalid number '{}'", parts[2]))?;
+    Ok((r, g, b))
 }
 
 /// determines the `Duration` to wait from a target `fps`
@@ -138,30 +179,8 @@ fn main() -> opencv::Result<()> {
             args.adjust,
             args.alpha
         )),
-        "sixelrgb" => Box::new(sixelrgb::SixelGreyscale::new(
-            vec![
-                (000,000,000),  // black
-
-                // some colours
-                (127,000,000),  // dark red
-                (255,000,000),  // bright red
-                (000,127,000),  // dark green
-                (000,255,000),  // bright green
-                (000,000,127),  // dark blue
-                (000,000,255),  // bright blue
-
-                // colour combinations
-                (127,000,127),  // purple I think??
-                (255,000,255),  // PURPLE????
-
-                (127,127,000),  // orange I think??
-                (255,255,000),  // ORANGE????
-
-                (000,127,127),  // some weird "aqua"
-                (000,255,255),  // ?????????????????????????
-
-                (255,255,255),  // white
-            ],
+        "sixelrgb" => Box::new(sixelrgb::SixelColour::new(
+            args.colours.unwrap_or_else(default_palette),
             args.adjust,
             args.alpha
         )),

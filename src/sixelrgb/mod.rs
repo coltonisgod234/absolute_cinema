@@ -7,21 +7,14 @@ use crate::video::*;
 use crate::sixel::*;
 use crate::sixelbw2::calc_avg_brightness;
 
-pub struct SixelGreyscale {
-    pub colours: Vec<(u8,u8,u8)>,
-    pub adjust: i8,
-    pub alpha: f32,
-    start_string: String
-}
-
 fn determine_start_string(colours: &Vec<(u8,u8,u8)>) -> String {
     let mut output = String::new();
     for (idx, colour) in colours.iter().enumerate() {
         let string: &str = &format!("#{};2;{};{};{}",
             idx,
-            rgb_to_sixel_percent(colour.0),  // R
+            rgb_to_sixel_percent(colour.2),  // R
             rgb_to_sixel_percent(colour.1),  // G
-            rgb_to_sixel_percent(colour.2)
+            rgb_to_sixel_percent(colour.0)   // B
         );
         output.push_str(string);
     }
@@ -37,10 +30,16 @@ fn closest_colour_index(target: (u8, u8, u8), colours: &[(u8, u8, u8)]) -> Optio
     }).map(|(i, _)| i)
 }
 
+pub struct SixelColour {
+    pub colours: Vec<(u8,u8,u8)>,
+    pub adjust: i8,
+    pub alpha: f32,
+    start_string: String
+}
 
-impl SixelGreyscale {
+impl SixelColour {
     pub fn new(colours: Vec<(u8,u8,u8)>, adjust: i8, alpha: f32) -> Self {
-        let renderer: SixelGreyscale = Self {
+        let renderer: SixelColour = Self {
             start_string: determine_start_string(&colours),
             adjust: adjust,
             alpha: alpha,
@@ -50,7 +49,7 @@ impl SixelGreyscale {
     }
 }
 
-impl Renderer for SixelGreyscale {
+impl Renderer for SixelColour {
     fn draw(&mut self, frame: &Mat) -> opencv::Result<Box<dyn Renderable>> {
         let mut output = String::new();
         output.push_str(BEGIN_SIXEL_BW);
@@ -68,7 +67,7 @@ impl Renderer for SixelGreyscale {
 
         for y_start in (0..height).step_by(6) {
             for x in 0..width {
-                let mut avg_colour: (i32, i32, i32) = (0i32,0i32,0i32);
+                let mut avg_colour = (0,0,0);
                 let mut pixels: [bool; 6] = [false; 6];
 
                 // collect pixels for this vertical band column
@@ -81,15 +80,15 @@ impl Renderer for SixelGreyscale {
 
                         // weird backwords because BGR is amazing
                         if on {
-                            avg_colour.0 += pixel_val[2] as i32;
+                            avg_colour.2 += pixel_val[2] as i32;
                             avg_colour.1 += pixel_val[1] as i32;
-                            avg_colour.2 += pixel_val[0] as i32;
+                            avg_colour.0 += pixel_val[0] as i32;
                         }
                     }
                 }
-                avg_colour.0 /= 6;  // guestimate, disgusting but I don't care to keep count
-                avg_colour.1 /= 6;
                 avg_colour.2 /= 6;
+                avg_colour.1 /= 6;
+                avg_colour.0 /= 6;  // guestimate, disgusting but I don't care to keep count
 
                 write!(output,
                     "#{}",
