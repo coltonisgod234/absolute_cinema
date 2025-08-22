@@ -22,6 +22,7 @@ mod sixel;
 mod sixelbw;
 mod sixelbw2;
 mod sixelrgb;
+mod sixelmp;
 
 // braille rendering
 mod braille;
@@ -183,6 +184,9 @@ fn main() -> opencv::Result<()> {
             args.colours.unwrap_or_else(default_palette),
             args.adjust,
             args.alpha
+        )),
+        "sixelmp" => Box::new(sixelmp::SixelMultipass::new(
+            args.colours.unwrap_or_else(default_palette),
         )),
         "cheesegrater" => Box::new(hires::HighRes {
             ch: '▄'

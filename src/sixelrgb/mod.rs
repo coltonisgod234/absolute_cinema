@@ -7,29 +7,6 @@ use crate::video::*;
 use crate::sixel::*;
 use crate::sixelbw2::calc_avg_brightness;
 
-fn determine_start_string(colours: &Vec<(u8,u8,u8)>) -> String {
-    let mut output = String::new();
-    for (idx, colour) in colours.iter().enumerate() {
-        let string: &str = &format!("#{};2;{};{};{}",
-            idx,
-            rgb_to_sixel_percent(colour.2),  // R
-            rgb_to_sixel_percent(colour.1),  // G
-            rgb_to_sixel_percent(colour.0)   // B
-        );
-        output.push_str(string);
-    }
-    return output
-}
-
-fn closest_colour_index(target: (u8, u8, u8), colours: &[(u8, u8, u8)]) -> Option<usize> {
-    colours.iter().enumerate().min_by_key(|&(_, &(r, g, b))| {
-        let dr = r as i32 - target.0 as i32;
-        let dg = g as i32 - target.1 as i32;
-        let db = b as i32 - target.2 as i32;
-        dr * dr + dg * dg + db * db
-    }).map(|(i, _)| i)
-}
-
 pub struct SixelColour {
     pub colours: Vec<(u8,u8,u8)>,
     pub adjust: i8,
