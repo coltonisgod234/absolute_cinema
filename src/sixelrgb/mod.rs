@@ -2,7 +2,6 @@ use opencv::{
     core::Vec3b,
     prelude::*,
 };
-use std::fmt::Write;
 use crate::video::*;
 use crate::sixel::*;
 use crate::sixelbw2::calc_avg_brightness;
@@ -66,21 +65,21 @@ impl Renderer for SixelColour {
                 avg_colour.2 /= 6;
                 avg_colour.1 /= 6;
                 avg_colour.0 /= 6;  // guestimate, disgusting but I don't care to keep count
+                
+                let pidx = closest_colour_index_rgb(
+                    (avg_colour.0 as u8, avg_colour.1 as u8, avg_colour.2 as u8),
+                    &self.colours
+                ).unwrap();
 
-                write!(output,
-                    "#{}",
-                    closest_colour_index(
-                        (avg_colour.0 as u8, avg_colour.1 as u8, avg_colour.2 as u8),
-                        &self.colours
-                    ).unwrap()
-                ).expect("failed to write to output");
+                output.push('#');
+                write_u8_to_str_noalloc(pidx as u8, &mut output);
 
                 output.push(calculate_sixel_cols(pixels));
             }
             output.push('-');
         }
 
-        output.push_str(END_SIXEL_BW);
+        output.push_str(END_SIXEL);
         Ok(Box::new(output))
     }
 }

@@ -41,7 +41,7 @@ impl Renderer for SixelMono {
             output.push('-');
         }
 
-        output.push_str(END_SIXEL_BW);
+        output.push_str(END_SIXEL);
         Ok(Box::new(output))
     }
 }

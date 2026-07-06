@@ -3,10 +3,15 @@ name = "absolute_cinema"
 version = "0.2.0"
 edition = "2024"
 
+authors = ["Colton Wollinger <cwoll1home@gmail.com>"]
+description = "Absolute Cinema"
+
+
 [dependencies]
 clap = { version = "4.5.43", features = ["derive"] }
 crossterm = "0.29.0"
-opencv = "0.95.1"
+#opencv = "0.95.1"
+opencv = "0.99"
 rayon = "1.11.0"
 regex = "1.11.1"
 rodio = "0.21.1"

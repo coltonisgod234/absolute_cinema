@@ -14,7 +14,7 @@ use opencv::{
     prelude::*,
 };
 use crate::{sixel::{
-    calculate_sixel_cols, sixel_is_on_bw, BEGIN_SIXEL_BW, END_SIXEL_BW
+    calculate_sixel_cols, sixel_is_on_bw, BEGIN_SIXEL_BW, END_SIXEL
 }, video::{Renderable, Renderer}};
 
 /// calculate the average brightness of a frame
@@ -88,7 +88,7 @@ impl Renderer for SixelMono2 {
 
         text.push_str(BEGIN_SIXEL_BW);
         text.push_str(&chunks.join("-"));
-        text.push_str(END_SIXEL_BW);
+        text.push_str(END_SIXEL);
 
         Ok(Box::new(text))
     }

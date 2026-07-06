@@ -1,6 +1,5 @@
 use std::{
-    thread::sleep,
-    time::{Duration, Instant},
+    fs, io::stdout, thread::sleep, time::{Duration, Instant}
 };
 use clap::Parser;
 use crossterm::terminal;
@@ -12,6 +11,8 @@ use opencv::{
 
 use crate::video::{Renderable, Renderer};
 mod audio;
+mod palette;
+pub mod subtitles;
 
 // graphics modes
 mod hires;
@@ -23,11 +24,13 @@ mod sixelbw;
 mod sixelbw2;
 mod sixelrgb;
 mod sixelmp;
+mod sixelmps;
 
 // braille rendering
 mod braille;
 mod braillebw;
 mod braillergb;
+mod the_numbers;
 
 mod statusbar;
 mod video;
@@ -51,6 +54,9 @@ struct Cli {
     #[arg(short='s', long="no-status-bar", help="don't print the status bar")]
     no_status_bar: bool,
 
+    #[arg(long="subtitles", help="subtitles file path (if subtitles are to be enabled)")]
+    subs: Option<String>,
+
     // graphics options
     #[arg(long="high-char", help="picks the char for high graphics mode", default_value_t='▀')]
     high_graphics_character: char,
@@ -68,34 +74,10 @@ struct Cli {
     alpha: f32,
 
     #[arg(short='c', long="colour", value_parser=parse_rgb)]
-    colours: Option<Vec<(u8,u8,u8)>>
-}
+    colours: Option<Vec<(u8,u8,u8)>>,
 
-/// a default palette to use when none is specified
-fn default_palette() -> Vec<(u8,u8,u8)> {
-    vec![
-        (000,000,000),  // black
-
-        // some colours
-        (127,000,000),  // dark red
-        (255,000,000),  // bright red
-        (000,127,000),  // dark green
-        (000,255,000),  // bright green
-        (000,000,127),  // dark blue
-        (000,000,255),  // bright blue
-
-        // colour combinations
-        (127,000,127),  // purple I think??
-        (255,000,255),  // PURPLE????
-
-        (127,127,000),  // orange I think??
-        (255,255,000),  // ORANGE????
-
-        (000,127,127),  // some weird "aqua"
-        (000,255,255),  // ?????????????????????????
-
-        (255,255,255),  // white
-    ]
+    #[arg(long="palette-builtin")]
+    premade_palette: Option<String>,
 }
 
 fn parse_rgb(s: &str) -> Result<(u8,u8,u8), String> {
@@ -103,10 +85,11 @@ fn parse_rgb(s: &str) -> Result<(u8,u8,u8), String> {
     if parts.len() != 3 {
         return Err(format!("Expected 3 comma-separated numbers, got '{}'", s));
     }
-    let r = parts[0].parse::<u8>().map_err(|_| format!("Invalid number '{}'", parts[0]))?;
-    let g = parts[1].parse::<u8>().map_err(|_| format!("Invalid number '{}'", parts[1]))?;
-    let b = parts[2].parse::<u8>().map_err(|_| format!("Invalid number '{}'", parts[2]))?;
-    Ok((r, g, b))
+
+    let r: u8 = parts[0].parse::<u8>().map_err(|_| format!("Invalid number '{}'", parts[0]))?;
+    let g: u8 = parts[1].parse::<u8>().map_err(|_| format!("Invalid number '{}'", parts[1]))?;
+    let b: u8 = parts[2].parse::<u8>().map_err(|_| format!("Invalid number '{}'", parts[2]))?;
+    return Ok((r, g, b))
 }
 
 /// determines the `Duration` to wait from a target `fps`
@@ -159,6 +142,30 @@ fn main() -> opencv::Result<()> {
     let term_width: u16 = args.width.unwrap_or_else(|| autodetect_term_size(&args).0);
     let term_height: u16 = args.height.unwrap_or_else(|| autodetect_term_size(&args).1);
 
+    // SO RETARDED BUT I HAVE TO DO IT
+    let (_subs, mut isubs) = if let Some(fp) = args.subs {
+        let cont = fs::read_to_string(&fp).expect("failed to read subtitles file");
+        let subs = subtitles::vtt::parse_vtt(&cont);
+        let isubs = subs.to_iterator();
+
+        (
+            Some(subs),
+            Some(isubs)
+        )
+    } else { (None, None) };
+
+    let palette_fn: fn() -> Vec<(u8, u8, u8)> = if let Some(premade_p) = args.premade_palette {
+        match premade_p.as_str() {
+            "manyshades" => palette::manyshades,
+            "234" => palette::p_6x6x6_rgb_cube,
+            "general" => palette::general,
+            "64" => palette::sixtyfour,
+            "list" => panic!("available palettes: manyshades, 234, general, 64, 16, 16.old"),
+            "16.old" => palette::sixteen_dated,
+            "16" | _ => palette::sixteen,
+        }
+    } else { palette::sixteen_dated };
+
     // pick a render function to use
     let mut renderer: Box<dyn Renderer> = match args.graphics.as_str() {
         "braillebw" => Box::new(braillebw::Braillebw {
@@ -181,16 +188,36 @@ fn main() -> opencv::Result<()> {
             args.alpha
         )),
         "sixelrgb" => Box::new(sixelrgb::SixelColour::new(
-            args.colours.unwrap_or_else(default_palette),
+            args.colours.unwrap_or_else(palette_fn),
             args.adjust,
             args.alpha
         )),
         "sixelmp" => Box::new(sixelmp::SixelMultipass::new(
-            args.colours.unwrap_or_else(default_palette),
+            args.colours.unwrap_or_else(palette_fn),
+        )),
+        "sixelmps" => Box::new(sixelmps::SixelMultipassHQ::new(
+            args.colours.unwrap_or_else(palette_fn)
         )),
         "cheesegrater" => Box::new(hires::HighRes {
             ch: '▄'
         }),
+        "the_numbers" => Box::new(the_numbers::GodDamnItItsTheNumbers),
+        "list" => {
+            println!("
+* braillebw
+* braillergb
+* high
+* low
+* the_numbers
+* sixelbw
+* sixelbw2
+* sixelrgb
+* sixelmp
+* sixelmps
+* cheesegrater
+* list");
+            return Ok(())
+        }
         _ => panic!("unrecognized renderer")
     };
 
@@ -198,10 +225,14 @@ fn main() -> opencv::Result<()> {
     let mut orig_frame: Mat = Mat::default();
     let mut frame: Mat = Mat::default();  // resized frame
 
+    let mut stdout: std::io::Stdout = stdout();
+
     // start playing audio (if enabled)
     let _stream: Option<rodio::OutputStream> = if !args.no_audio {
         Some(audio::start_audio(video_path).expect("audio failed to start"))
     } else { None };
+
+    let now = Instant::now();
 
     // start drawing shit
     loop {
@@ -229,7 +260,7 @@ fn main() -> opencv::Result<()> {
 
         // draw the frame
         let output: Box<dyn Renderable> = renderer.draw(&frame)?;
-        output.render();
+        output.render(&mut stdout);
 
         let loop_end = Instant::now();
         let loop_duration = loop_end - loop_start;
@@ -241,19 +272,28 @@ fn main() -> opencv::Result<()> {
 
         // draw the status bar
         if !args.no_status_bar {
+            let substr: &str = if let Some(itr) = &mut isubs {
+                if let Some(sub) = itr.at(now.elapsed().as_secs_f64()) {
+                    &sub.text
+                } else { "" }
+            } else { "(NO SUBS LOADED)" };
+
             statusbar::draw_status_bar(
                 frame_read_duration,
                 loop_duration,
                 sleep_time,
                 fps,
                 cap.get(CAP_PROP_POS_FRAMES).unwrap_or(-1.0),
-                !args.no_audio
+                !args.no_audio,
             );
+
+            print!("\n\t\t\t{}", substr);
         }
     }
 
     println!("video done, terminating");
-    Ok(())
+
+    return Ok(())
 }
 
 // unit testing

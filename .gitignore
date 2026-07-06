@@ -1,4 +1,5 @@
 /target
+/resources
 *.mp4
 *old*
 *.lock
